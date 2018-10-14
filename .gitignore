@@ -1,0 +1,8 @@
+bin/ca/ubc/cs/cs317/dnslookup/ResourceRecord.class
+bin/ca/ubc/cs/cs317/dnslookup/DNSLookupService.class
+.settings/org.eclipse.jdt.core.prefs
+.classpath
+bin/ca/ubc/cs/cs317/dnslookup/RecordType.class
+bin/ca/ubc/cs/cs317/dnslookup/DNSNode.class
+bin/ca/ubc/cs/cs317/dnslookup/DNSCache.class
+.project
