@@ -1,6 +1,8 @@
 package ca.ubc.cs.cs317.dnslookup;
 
 import java.io.Console;
+import java.io.IOException;
+import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
@@ -175,7 +177,13 @@ public class DNSLookupService {
             return Collections.emptySet();
         }
 
-        // TODO To be completed by the student
+        byte[] buf = new byte[256];
+        DatagramPacket dpack = new DatagramPacket(buf, buf.length, rootServer, DEFAULT_DNS_PORT);
+        try {
+            socket.send(dpack);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
         return cache.getCachedResults(node);
     }
