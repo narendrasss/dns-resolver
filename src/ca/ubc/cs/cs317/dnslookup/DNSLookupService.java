@@ -178,6 +178,8 @@ public class DNSLookupService {
         }
 
         byte[] buf = new byte[256];
+        String message = "test";
+        buf = message.getBytes();
         DatagramPacket dpack = new DatagramPacket(buf, buf.length, rootServer, DEFAULT_DNS_PORT);
         try {
             socket.send(dpack);
