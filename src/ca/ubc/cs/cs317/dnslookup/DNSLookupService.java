@@ -1,6 +1,8 @@
 package ca.ubc.cs.cs317.dnslookup;
 
+import java.io.ByteArrayOutputStream;
 import java.io.Console;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -177,6 +179,14 @@ public class DNSLookupService {
             return Collections.emptySet();
         }
 
+        try {
+            sendToDNS();
+        } catch (IOException e1) {
+            // TODO Auto-generated catch block
+            e1.printStackTrace();
+        }
+        
+        // EXAMPLE SEND
         byte[] buf = new byte[256];
         String message = "test";
         buf = message.getBytes();
@@ -201,6 +211,24 @@ public class DNSLookupService {
     private static void retrieveResultsFromServer(DNSNode node, InetAddress server) {
 
         // TODO To be completed by the student
+    }
+    
+    private static void sendToDNS() throws IOException {
+        ByteArrayOutputStream bytearrayOS = new ByteArrayOutputStream();
+        DataOutputStream dataOS= new DataOutputStream(bytearrayOS);
+        
+        // Transaction ID
+        dataOS.writeShort(0xAAAA);
+        // Flags
+        dataOS.writeShort(0x0100);
+        // # Questions
+        dataOS.writeShort(0x0001);
+        // # Answers (Should be 0 since we're querying)
+        dataOS.writeShort(0x0000);
+        // # Authorities (Should be 0 since we're querying)
+        dataOS.writeShort(0x0000);
+        // # Additionals (Should be 0 since we're querying)
+        dataOS.writeShort(0x0000);
     }
 
     private static void verbosePrintResourceRecord(ResourceRecord record, int rtype) {
