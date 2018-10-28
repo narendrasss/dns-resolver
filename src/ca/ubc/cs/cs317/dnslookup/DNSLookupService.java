@@ -180,21 +180,10 @@ public class DNSLookupService {
         }
 
         try {
-            sendToDNS();
+            sendToDNS(node);
         } catch (IOException e1) {
             // TODO Auto-generated catch block
             e1.printStackTrace();
-        }
-        
-        // EXAMPLE SEND
-        byte[] buf = new byte[256];
-        String message = "test";
-        buf = message.getBytes();
-        DatagramPacket dpack = new DatagramPacket(buf, buf.length, rootServer, DEFAULT_DNS_PORT);
-        try {
-            socket.send(dpack);
-        } catch (IOException e) {
-            e.printStackTrace();
         }
 
         return cache.getCachedResults(node);
@@ -213,7 +202,7 @@ public class DNSLookupService {
         // TODO To be completed by the student
     }
     
-    private static void sendToDNS() throws IOException {
+    private static void sendToDNS(DNSNode node) throws IOException {
         ByteArrayOutputStream bytearrayOS = new ByteArrayOutputStream();
         DataOutputStream dataOS= new DataOutputStream(bytearrayOS);
         
@@ -229,6 +218,35 @@ public class DNSLookupService {
         dataOS.writeShort(0x0000);
         // # Additionals (Should be 0 since we're querying)
         dataOS.writeShort(0x0000);
+        
+        String[] domainParts = node.getHostName().split("\\.");
+        System.out.println(node.getHostName() + " has " + domainParts.length + " parts");
+
+        for (int i = 0; i<domainParts.length; i++) {
+            System.out.println("Writing: " + domainParts[i]);
+            byte[] domainBytes = domainParts[i].getBytes("UTF-8");
+            dataOS.writeByte(domainBytes.length);
+            dataOS.write(domainBytes);
+        }
+        
+        // No more parts
+        dataOS.writeByte(0x00);
+        // Type 0x01 = A (Host Request)
+        dataOS.writeShort(node.getType().getCode());
+        // Class 0x01 = IN
+        dataOS.writeShort(0x0001);
+
+        byte[] dnsFrame = bytearrayOS.toByteArray();
+
+        System.out.println("Sending: " + dnsFrame.length + " bytes");
+        for (int i =0; i< dnsFrame.length; i++) {
+            System.out.print("0x" + String.format("%x", dnsFrame[i]) + " " );
+        }
+
+        // *** Send DNS Request Frame ***
+        DatagramSocket socket = new DatagramSocket();
+        DatagramPacket dnsReqPacket = new DatagramPacket(dnsFrame, dnsFrame.length, rootServer, DEFAULT_DNS_PORT);
+        socket.send(dnsReqPacket);
     }
 
     private static void verbosePrintResourceRecord(ResourceRecord record, int rtype) {
