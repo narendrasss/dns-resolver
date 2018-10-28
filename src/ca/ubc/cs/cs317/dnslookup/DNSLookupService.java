@@ -178,12 +178,36 @@ public class DNSLookupService {
             System.err.println("Maximum number of indirection levels reached.");
             return Collections.emptySet();
         }
-
-        try {
-            sendToDNS(node);
-        } catch (IOException e1) {
-            // TODO Auto-generated catch block
-            e1.printStackTrace();
+        
+        // Get results starting at the root DNS server
+        retrieveResultsFromServer(node, rootServer);
+        
+        // foundResults = did we find 
+        boolean foundResults = false;
+        DNSNode cNameNode = null;
+        
+        // For every cached resource record for the current name (ie. "google.com")
+        for (ResourceRecord result : cache.getCachedResults(node)) {
+            // Check what type of record it is
+            RecordType recordType = result.getType();
+            if (recordType.equals(node.getType())) {
+                // If it is the same type as what we're looking for, we have found what we need and don't need to look anymore
+                // Note: node.getType() should be RecordType.A or RecordType.AAAA
+                //       Anything else is probably an error
+                foundResults = true;
+            } else if (recordType.equals(RecordType.CNAME)) {
+                // TODO - Since this is a CNAME, we need to build a NEW query node and start again at the root server with this
+                //        We will only start again with this new node if foundResults == false, since that means we didn't find any good results
+                String cName = "";
+                cNameNode = new DNSNode(cName, node.getType());
+            }
+        }
+        
+        // If we did NOT find any A or AAAA records
+        if (!foundResults) {
+            // Should probably check in here whether or not we actually found a CNAME, but for now, let's pretend we did
+            // In that case, we recurse on getResults with +1 indirectionLevel
+            return getResults(cNameNode, indirectionLevel++);
         }
 
         return cache.getCachedResults(node);
@@ -198,15 +222,39 @@ public class DNSLookupService {
      * @param server Address of the server to be used for the query.
      */
     private static void retrieveResultsFromServer(DNSNode node, InetAddress server) {
-
-        // TODO To be completed by the student
+        try {
+            // Send our query to the given DNS server
+            sendToDNS(node, server, DEFAULT_DNS_PORT);
+            
+            // TODO - Need to get and parse response from server.
+            // Example at (https://stackoverflow.com/questions/36743226/java-send-udp-packet-to-dns-server/39375234)
+            
+            // TODO - Need to create ResourceRecords for parsed response and add them to the cache
+            
+            // Now that we've added all of the responses to the cache,
+            // we should look at the cache and decide what to do based on what we got back.
+            Set<ResourceRecord> results = cache.getCachedResults(node);
+            
+            // For every result we got back
+            for (ResourceRecord result : results) {
+                // Check what type of record it is
+                RecordType recordType = result.getType();
+                if (recordType.equals(RecordType.NS)) {
+                    // If it is NS, we need to get results from that server and add it to the cache
+                    retrieveResultsFromServer(result.getNode(), result.getInetResult());
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
     
-    private static void sendToDNS(DNSNode node) throws IOException {
+    private static void sendToDNS(DNSNode node, InetAddress address, int port) throws IOException {
         ByteArrayOutputStream bytearrayOS = new ByteArrayOutputStream();
         DataOutputStream dataOS= new DataOutputStream(bytearrayOS);
         
         // Transaction ID
+        // TODO - Should use random.getInt(65535) or something to produce unique IDs
         dataOS.writeShort(0xAAAA);
         // Flags
         dataOS.writeShort(0x0100);
@@ -244,8 +292,7 @@ public class DNSLookupService {
         }
 
         // *** Send DNS Request Frame ***
-        DatagramSocket socket = new DatagramSocket();
-        DatagramPacket dnsReqPacket = new DatagramPacket(dnsFrame, dnsFrame.length, rootServer, DEFAULT_DNS_PORT);
+        DatagramPacket dnsReqPacket = new DatagramPacket(dnsFrame, dnsFrame.length, address, port);
         socket.send(dnsReqPacket);
     }
 
