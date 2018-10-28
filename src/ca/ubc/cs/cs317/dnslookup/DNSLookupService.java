@@ -182,7 +182,7 @@ public class DNSLookupService {
         // Get results starting at the root DNS server
         retrieveResultsFromServer(node, rootServer);
         
-        // foundResults = did we find 
+        // foundResults = did we find what we're looking for
         boolean foundResults = false;
         DNSNode cNameNode = null;
         
