@@ -3,12 +3,14 @@ package ca.ubc.cs.cs317.dnslookup;
 import java.nio.ByteBuffer;
 
 public class DNSResponse {
-	
-	public byte[] header = new byte[12];
-	public byte[] question;
+
+	public byte[] header;
 	public byte[] answer;
-	
+	public byte[] auths;
+	public byte[] additionals;
+
 	public DNSResponse(byte[] data) {
+<<<<<<< HEAD
 		int offset = 0;
 		// GET HEADER
 		for (int i = 0; i < 12; i++) {
@@ -77,38 +79,31 @@ public class DNSResponse {
 	
 	int getByteInt(byte[] bytes) {
 	     return ByteBuffer.wrap(bytes).getInt();
+=======
+		parseHeader(data);
+		parseAnswer(data);
+		parseAuth(data);
+		parseAdditionals(data);
+>>>>>>> parsing
 	}
-	
-	public byte[] getQueryId() {
-		byte[] rbuf = new byte[2];
-		rbuf[0] = header[0];
-		rbuf[1] = header[1];
-		return rbuf;
+
+	private void parseHeader(byte[] data) {
+		byte[] header;
+		this.header = header;
 	}
-	
-	public byte[] getNumQuestion() {
-		byte[] rbuf = new byte[2];
-		rbuf[0] = header[4];
-		rbuf[1] = header[5];
-		return rbuf;
+
+	private void parseAuth(byte[] data) {
+		byte[] auths;
+		this.auths = auths;
 	}
-	public byte[] getNumAnswer() {
-		byte[] rbuf = new byte[2];
-		rbuf[0] = header[6];
-		rbuf[1] = header[7];
-		return rbuf;
+
+	private void parseAdditionals(byte[] data) {
+		byte[] additionals;
+		this.additionals = additionals;
 	}
-	public byte[] getNumAuthority() {
-		byte[] rbuf = new byte[2];
-		rbuf[0] = header[8];
-		rbuf[1] = header[9];
-		return rbuf;
-	}
-	public byte[] getNumAdditional() {
-		byte[] rbuf = new byte[2];
-		rbuf[0] = header[10];
-		rbuf[1] = header[11];
-		return rbuf;
+
+	public getNumberAuthoritatives() {
+
 	}
 
 }
