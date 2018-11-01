@@ -5,9 +5,8 @@ import java.nio.ByteBuffer;
 public class DNSResponse {
 
 	public byte[] header;
-	public byte[] answer;
-	public byte[] auths;
-	public byte[] additionals;
+	public ArrayList<DNSRObject> answers = new ArrayList();
+	public ArrayList<DNSRObject> auths = new ArrayList();
 
 	public DNSResponse(byte[] data) {
 		parseHeader(data);
