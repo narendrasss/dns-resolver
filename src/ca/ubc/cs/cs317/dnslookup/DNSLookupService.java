@@ -294,6 +294,22 @@ public class DNSLookupService {
         // *** Send DNS Request Frame ***
         DatagramPacket dnsReqPacket = new DatagramPacket(dnsFrame, dnsFrame.length, address, port);
         socket.send(dnsReqPacket);
+
+        byte[] buf = new byte[1024];
+        DatagramPacket packet = new DatagramPacket(buf, buf.length);
+        socket.receive(packet);
+
+        System.out.println("\n\nReceived: " + packet.getLength() + " bytes");
+        parseResponse(buf);
+
+        for (int i = 0; i < packet.getLength(); i++) {
+            System.out.print(" 0x" + String.format("%x", buf[i]) + " ");
+        }
+        System.out.println("\n");
+    }
+
+    private static void parseResponse(byte[] response) {
+        
     }
 
     private static void verbosePrintResourceRecord(ResourceRecord record, int rtype) {
