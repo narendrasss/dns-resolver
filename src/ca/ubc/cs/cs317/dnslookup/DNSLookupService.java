@@ -233,11 +233,13 @@ public class DNSLookupService {
     private static void retrieveResultsFromServer(DNSNode node, InetAddress server) {
         try {
             // Send our query to the given DNS server
-            sendToDNS(node, server, DEFAULT_DNS_PORT);
+            byte[] response = sendToDNS(node, server, DEFAULT_DNS_PORT);
 
             // TODO - Need to get and parse response from server.
             // Example at
             // (https://stackoverflow.com/questions/36743226/java-send-udp-packet-to-dns-server/39375234)
+            
+            parseResponse(response);
 
             // TODO - Need to create ResourceRecords for parsed response and add them to the
             // cache
@@ -260,7 +262,7 @@ public class DNSLookupService {
         }
     }
 
-    private static void sendToDNS(DNSNode node, InetAddress address, int port) throws IOException {
+    private static byte[] sendToDNS(DNSNode node, InetAddress address, int port) throws IOException {
         ByteArrayOutputStream bytearrayOS = new ByteArrayOutputStream();
         DataOutputStream dataOS = new DataOutputStream(bytearrayOS);
 
@@ -311,7 +313,6 @@ public class DNSLookupService {
         socket.receive(packet);
 
         System.out.println("\n\nReceived: " + packet.getLength() + " bytes");
-        parseResponse(buf);
 
         for (int i = 0; i < packet.getLength(); i++) {
             if (String.format("%x", buf[i]).length() == 1) {
@@ -328,10 +329,18 @@ public class DNSLookupService {
             }
         }
         System.out.println("\n");
+        
+        return buf;
     }
 
+    /**
+     * Takes a series of bytes representing a response, parses the response, builds
+     * the corresponding ResourceRecords, and adds them to the cache.
+     * @param response
+     */
     private static void parseResponse(byte[] response) {
-
+    	DNSResponse parsedResponse = new DNSResponse(response);
+    	// TODO - CONTINUE
     }
 
     private static void verbosePrintResourceRecord(ResourceRecord record, int rtype) {
