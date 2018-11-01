@@ -34,7 +34,8 @@ public class DNSLookupService {
         if (args.length != 1) {
             System.err.println("Invalid call. Usage:");
             System.err.println("\tjava -jar DNSLookupService.jar rootServer");
-            System.err.println("where rootServer is the IP address (in dotted form) of the root DNS server to start the search at.");
+            System.err.println(
+                    "where rootServer is the IP address (in dotted form) of the root DNS server to start the search at.");
             System.exit(1);
         }
 
@@ -69,18 +70,19 @@ public class DNSLookupService {
                     break;
                 }
             // If reached end-of-file, leave
-            if (commandLine == null) break;
+            if (commandLine == null)
+                break;
 
             // Ignore leading/trailing spaces and anything beyond a comment character
             commandLine = commandLine.trim().split("#", 2)[0];
 
             // If no command shown, skip to next command
-            if (commandLine.trim().isEmpty()) continue;
+            if (commandLine.trim().isEmpty())
+                continue;
 
             String[] commandArgs = commandLine.split(" ");
 
-            if (commandArgs[0].equalsIgnoreCase("quit") ||
-                    commandArgs[0].equalsIgnoreCase("exit"))
+            if (commandArgs[0].equalsIgnoreCase("quit") || commandArgs[0].equalsIgnoreCase("exit"))
                 break;
             else if (commandArgs[0].equalsIgnoreCase("server")) {
                 // SERVER: Change root nameserver
@@ -112,8 +114,7 @@ public class DNSLookupService {
                     System.err.println("Invalid call. Format:\n\ttrace on|off");
                     continue;
                 }
-            } else if (commandArgs[0].equalsIgnoreCase("lookup") ||
-                    commandArgs[0].equalsIgnoreCase("l")) {
+            } else if (commandArgs[0].equalsIgnoreCase("lookup") || commandArgs[0].equalsIgnoreCase("l")) {
                 // LOOKUP: Find and print all results associated to a name.
                 RecordType type;
                 if (commandArgs.length == 2)
@@ -150,7 +151,8 @@ public class DNSLookupService {
     }
 
     /**
-     * Finds all results for a host name and type and prints them on the standard output.
+     * Finds all results for a host name and type and prints them on the standard
+     * output.
      *
      * @param hostName Fully qualified domain name of the host being searched.
      * @param type     Record type for search.
@@ -165,12 +167,15 @@ public class DNSLookupService {
      * Finds all the result for a specific node.
      *
      * @param node             Host and record type to be used for search.
-     * @param indirectionLevel Control to limit the number of recursive calls due to CNAME redirection.
-     *                         The initial call should be made with 0 (zero), while recursive calls for
-     *                         regarding CNAME results should increment this value by 1. Once this value
-     *                         reaches MAX_INDIRECTION_LEVEL, the function prints an error message and
-     *                         returns an empty set.
-     * @return A set of resource records corresponding to the specific query requested.
+     * @param indirectionLevel Control to limit the number of recursive calls due to
+     *                         CNAME redirection. The initial call should be made
+     *                         with 0 (zero), while recursive calls for regarding
+     *                         CNAME results should increment this value by 1. Once
+     *                         this value reaches MAX_INDIRECTION_LEVEL, the
+     *                         function prints an error message and returns an empty
+     *                         set.
+     * @return A set of resource records corresponding to the specific query
+     *         requested.
      */
     private static Set<ResourceRecord> getResults(DNSNode node, int indirectionLevel) {
 
@@ -178,34 +183,38 @@ public class DNSLookupService {
             System.err.println("Maximum number of indirection levels reached.");
             return Collections.emptySet();
         }
-        
+
         // Get results starting at the root DNS server
         retrieveResultsFromServer(node, rootServer);
-        
+
         // foundResults = did we find what we're looking for
         boolean foundResults = false;
         DNSNode cNameNode = null;
-        
+
         // For every cached resource record for the current name (ie. "google.com")
         for (ResourceRecord result : cache.getCachedResults(node)) {
             // Check what type of record it is
             RecordType recordType = result.getType();
             if (recordType.equals(node.getType())) {
-                // If it is the same type as what we're looking for, we have found what we need and don't need to look anymore
+                // If it is the same type as what we're looking for, we have found what we need
+                // and don't need to look anymore
                 // Note: node.getType() should be RecordType.A or RecordType.AAAA
-                //       Anything else is probably an error
+                // Anything else is probably an error
                 foundResults = true;
             } else if (recordType.equals(RecordType.CNAME)) {
-                // TODO - Since this is a CNAME, we need to build a NEW query node and start again at the root server with this
-                //        We will only start again with this new node if foundResults == false, since that means we didn't find any good results
+                // TODO - Since this is a CNAME, we need to build a NEW query node and start
+                // again at the root server with this
+                // We will only start again with this new node if foundResults == false, since
+                // that means we didn't find any good results
                 String cName = "";
                 cNameNode = new DNSNode(cName, node.getType());
             }
         }
-        
+
         // If we did NOT find any A or AAAA records
         if (!foundResults) {
-            // Should probably check in here whether or not we actually found a CNAME, but for now, let's pretend we did
+            // Should probably check in here whether or not we actually found a CNAME, but
+            // for now, let's pretend we did
             // In that case, we recurse on getResults with +1 indirectionLevel
             return getResults(cNameNode, indirectionLevel++);
         }
@@ -214,9 +223,9 @@ public class DNSLookupService {
     }
 
     /**
-     * Retrieves DNS results from a specified DNS server. Queries are sent in iterative mode,
-     * and the query is repeated with a new server if the provided one is non-authoritative.
-     * Results are stored in the cache.
+     * Retrieves DNS results from a specified DNS server. Queries are sent in
+     * iterative mode, and the query is repeated with a new server if the provided
+     * one is non-authoritative. Results are stored in the cache.
      *
      * @param node   Host name and record type to be used for the query.
      * @param server Address of the server to be used for the query.
@@ -225,16 +234,18 @@ public class DNSLookupService {
         try {
             // Send our query to the given DNS server
             sendToDNS(node, server, DEFAULT_DNS_PORT);
-            
+
             // TODO - Need to get and parse response from server.
-            // Example at (https://stackoverflow.com/questions/36743226/java-send-udp-packet-to-dns-server/39375234)
-            
-            // TODO - Need to create ResourceRecords for parsed response and add them to the cache
-            
+            // Example at
+            // (https://stackoverflow.com/questions/36743226/java-send-udp-packet-to-dns-server/39375234)
+
+            // TODO - Need to create ResourceRecords for parsed response and add them to the
+            // cache
+
             // Now that we've added all of the responses to the cache,
             // we should look at the cache and decide what to do based on what we got back.
             Set<ResourceRecord> results = cache.getCachedResults(node);
-            
+
             // For every result we got back
             for (ResourceRecord result : results) {
                 // Check what type of record it is
@@ -248,11 +259,11 @@ public class DNSLookupService {
             e.printStackTrace();
         }
     }
-    
+
     private static void sendToDNS(DNSNode node, InetAddress address, int port) throws IOException {
         ByteArrayOutputStream bytearrayOS = new ByteArrayOutputStream();
-        DataOutputStream dataOS= new DataOutputStream(bytearrayOS);
-        
+        DataOutputStream dataOS = new DataOutputStream(bytearrayOS);
+
         // Transaction ID
         // TODO - Should use random.getInt(65535) or something to produce unique IDs
         dataOS.writeShort(0xAAAA);
@@ -266,17 +277,17 @@ public class DNSLookupService {
         dataOS.writeShort(0x0000);
         // # Additionals (Should be 0 since we're querying)
         dataOS.writeShort(0x0000);
-        
+
         String[] domainParts = node.getHostName().split("\\.");
         System.out.println(node.getHostName() + " has " + domainParts.length + " parts");
 
-        for (int i = 0; i<domainParts.length; i++) {
+        for (int i = 0; i < domainParts.length; i++) {
             System.out.println("Writing: " + domainParts[i]);
             byte[] domainBytes = domainParts[i].getBytes("UTF-8");
             dataOS.writeByte(domainBytes.length);
             dataOS.write(domainBytes);
         }
-        
+
         // No more parts
         dataOS.writeByte(0x00);
         // Type 0x01 = A (Host Request)
@@ -287,8 +298,8 @@ public class DNSLookupService {
         byte[] dnsFrame = bytearrayOS.toByteArray();
 
         System.out.println("Sending: " + dnsFrame.length + " bytes");
-        for (int i =0; i< dnsFrame.length; i++) {
-            System.out.print("0x" + String.format("%x", dnsFrame[i]) + " " );
+        for (int i = 0; i < dnsFrame.length; i++) {
+            System.out.print("0x" + String.format("%x", dnsFrame[i]) + " ");
         }
 
         // *** Send DNS Request Frame ***
@@ -303,21 +314,30 @@ public class DNSLookupService {
         parseResponse(buf);
 
         for (int i = 0; i < packet.getLength(); i++) {
-            System.out.print(" 0x" + String.format("%x", buf[i]) + " ");
+            if (String.format("%x", buf[i]).length() == 1) {
+                System.out.print(" 0" + String.format("%x", buf[i]) + " ");
+            } else {
+                System.out.print(" " + String.format("%x", buf[i]) + " ");
+            }
+            if ((i + 1) % 8 == 0) {
+                if ((i + 1) % 16 == 0) {
+                    System.out.print("\n");
+                } else {
+                    System.out.print("  ");
+                }
+            }
         }
         System.out.println("\n");
     }
 
     private static void parseResponse(byte[] response) {
-        
+
     }
 
     private static void verbosePrintResourceRecord(ResourceRecord record, int rtype) {
         if (verboseTracing)
-            System.out.format("       %-30s %-10d %-4s %s\n", record.getHostName(),
-                    record.getTTL(),
-                    record.getType() == RecordType.OTHER ? rtype : record.getType(),
-                    record.getTextResult());
+            System.out.format("       %-30s %-10d %-4s %s\n", record.getHostName(), record.getTTL(),
+                    record.getType() == RecordType.OTHER ? rtype : record.getType(), record.getTextResult());
     }
 
     /**
@@ -328,11 +348,10 @@ public class DNSLookupService {
      */
     private static void printResults(DNSNode node, Set<ResourceRecord> results) {
         if (results.isEmpty())
-            System.out.printf("%-30s %-5s %-8d %s\n", node.getHostName(),
-                    node.getType(), -1, "0.0.0.0");
+            System.out.printf("%-30s %-5s %-8d %s\n", node.getHostName(), node.getType(), -1, "0.0.0.0");
         for (ResourceRecord record : results) {
-            System.out.printf("%-30s %-5s %-8d %s\n", node.getHostName(),
-                    node.getType(), record.getTTL(), record.getTextResult());
+            System.out.printf("%-30s %-5s %-8d %s\n", node.getHostName(), node.getType(), record.getTTL(),
+                    record.getTextResult());
         }
     }
 }
