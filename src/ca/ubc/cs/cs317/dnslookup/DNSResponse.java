@@ -29,6 +29,7 @@ public class DNSResponse {
 				while (data[offset+qsize] != 0x00) {
 					qsize++;
 				}
+				qsize++;
 				qsize = qsize+4;
 				question = new byte[qsize];
 				for (int i = 0; i < qsize; i++) {
@@ -57,7 +58,14 @@ public class DNSResponse {
 				while (data[offset+qsize] != 0x00) {
 					qsize++;
 				}
-				qsize = qsize+14;
+				qsize++;
+				qsize = qsize+8;
+				byte[] rbuf = new byte[2];
+				rbuf[0] = data[offset+qsize];
+				qsize++;
+				rbuf[1] = data[offset+qsize];
+				qsize++;
+				int responseSize = getByteInt(rbuf);
 				question = new byte[qsize];
 				for (int i = 0; i < qsize; i++) {
 					question[i] = data[offset+i];
