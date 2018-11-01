@@ -4,9 +4,8 @@ import java.nio.ByteBuffer;
 
 public class DNSResponse {
 
-	public byte[] header;
-	public ArrayList<DNSRObject> answers = new ArrayList();
-	public ArrayList<DNSRObject> auths = new ArrayList();
+	private byte[] header;
+	public ArrayList<DNSRObject> responses = new ArrayList();
 
 	public DNSResponse(byte[] data) {
 		parseHeader(data);
@@ -17,21 +16,18 @@ public class DNSResponse {
 
 	private void parseHeader(byte[] data) {
 		byte[] header;
-		this.header = header;
 	}
 
 	private void parseAuth(byte[] data) {
 		byte[] auths;
-		this.auths = auths;
 	}
 
 	private void parseAdditionals(byte[] data) {
 		byte[] additionals;
-		this.additionals = additionals;
 	}
 
-	public int getNumberAuthoritatives() {
-		return 0;
+	public ArrayList<DNSRObject> getResponses() {
+		return this.responses;
 	}
 
 }
