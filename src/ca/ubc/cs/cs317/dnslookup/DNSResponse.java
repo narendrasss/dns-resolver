@@ -3,104 +3,36 @@ package ca.ubc.cs.cs317.dnslookup;
 import java.nio.ByteBuffer;
 
 public class DNSResponse {
-	
-	public byte[] header = new byte[12];
-	public byte[] question;
+
+	public byte[] header;
 	public byte[] answer;
-	
+	public byte[] auths;
+	public byte[] additionals;
+
 	public DNSResponse(byte[] data) {
-		int offset = 0;
-		// GET HEADER
-		for (int i = 0; i < 12; i++) {
-			header[i] = data[i];
-		}
-		offset = 12;
-		
-		// GET QUESTIONS
-		if (data[offset] == 0xc0) {
-			offset = offset+6;
-			question = new byte[6];
-			for (int i = 0; i < 6; i++) {
-				question[i] = data[offset+i];
-			}
-		} else {
-			for (int j = 0; j < getByteInt(getNumQuestion()); j++) {
-				int qsize = 0;
-				while (data[offset+qsize] != 0x00) {
-					qsize++;
-				}
-				qsize = qsize+4;
-				question = new byte[qsize];
-				for (int i = 0; i < qsize; i++) {
-					question[i] = data[offset+i];
-				}
-				offset += qsize;
-			}
-		}
-		
-		// GET ANSWERS
-		if (data[offset] == 0xc0) {
-			offset = offset+10;
-			byte[] rbuf = new byte[2];
-			rbuf[0] = data[offset];
-			offset++;
-			rbuf[1] = data[offset];
-			offset++;
-			int responseSize = getByteInt(rbuf);
-			question = new byte[12+responseSize];
-			for (int i = 0; i < 16; i++) {
-				question[i] = data[offset+i];
-			}
-		} else {
-			for (int j = 0; j < getByteInt(getNumAnswer()); j++) {
-				int qsize = 0;
-				while (data[offset+qsize] != 0x00) {
-					qsize++;
-				}
-				qsize = qsize+14;
-				question = new byte[qsize];
-				for (int i = 0; i < qsize; i++) {
-					question[i] = data[offset+i];
-				}
-				offset += qsize;
-			}
-		}
+		parseHeader(data);
+		parseAnswer(data);
+		parseAuth(data);
+		parseAdditionals(data);
 	}
-	
-	int getByteInt(byte[] bytes) {
-	     return ByteBuffer.wrap(bytes).getInt();
+
+	private void parseHeader(byte[] data) {
+		byte[] header;
+		this.header = header;
 	}
-	
-	public byte[] getQueryId() {
-		byte[] rbuf = new byte[2];
-		rbuf[0] = header[0];
-		rbuf[1] = header[1];
-		return rbuf;
+
+	private void parseAuth(byte[] data) {
+		byte[] auths;
+		this.auths = auths;
 	}
-	
-	public byte[] getNumQuestion() {
-		byte[] rbuf = new byte[2];
-		rbuf[0] = header[4];
-		rbuf[1] = header[5];
-		return rbuf;
+
+	private void parseAdditionals(byte[] data) {
+		byte[] additionals;
+		this.additionals = additionals;
 	}
-	public byte[] getNumAnswer() {
-		byte[] rbuf = new byte[2];
-		rbuf[0] = header[6];
-		rbuf[1] = header[7];
-		return rbuf;
-	}
-	public byte[] getNumAuthority() {
-		byte[] rbuf = new byte[2];
-		rbuf[0] = header[8];
-		rbuf[1] = header[9];
-		return rbuf;
-	}
-	public byte[] getNumAdditional() {
-		byte[] rbuf = new byte[2];
-		rbuf[0] = header[10];
-		rbuf[1] = header[11];
-		return rbuf;
+
+	public getNumberAuthoritatives() {
+
 	}
 
 }
