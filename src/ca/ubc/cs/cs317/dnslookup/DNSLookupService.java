@@ -241,12 +241,33 @@ public class DNSLookupService {
 
             DNSResponse parsedResponse = new DNSResponse(response);
 
+            ArrayList<ResourceRecord> answers = parsedResponse.getAnswers();
+            ArrayList<ResourceRecord> nameServers = parsedResponse.getNameServers();
+            ArrayList<ResourceRecord> additionals = parsedResponse.getAdditionals();
+
+            if (verboseTracing) {
+                System.out.print("Response ID: " + parsedResponse.getId());
+                System.out.print(" Authoritative: " + parsedResponse.isAuthoritative() + "\n");
+                System.out.println("Answers (" + parsedResponse.getAnswers().size() + ")");
+                for (ResourceRecord r : answers) {
+                    verbosePrintResourceRecord(r, r.getType().getCode());
+                }
+                System.out.println("Nameservers (" + parsedResponse.getNameServers().size() + ")");
+                for (ResourceRecord r : nameServers) {
+                    verbosePrintResourceRecord(r, r.getType().getCode());
+                }
+                System.out.println("Additional Information (" + parsedResponse.getAdditionals().size() + ")");
+                for (ResourceRecord r : additionals) {
+                    verbosePrintResourceRecord(r, r.getType().getCode());
+                }
+            }
+
             // TODO - Need to create ResourceRecords for parsed response and add them to the
             // cache
 
             // Now that we've added all of the responses to the cache,
             // we should look at the cache and decide what to do based on what we got back.
-            ArrayList<ResourceRecord> answers = parsedResponse.getAnswers();
+            /*ArrayList<ResourceRecord> answers = parsedResponse.getAnswers();
             if (answers.size() == 0) {
             	ArrayList<ResourceRecord> nameServers = parsedResponse.getNameServers();
             	if (nameServers.size() == 0) {
@@ -265,7 +286,7 @@ public class DNSLookupService {
             	for (ResourceRecord a : answers) {
             		cache.addResult(a);
             	}
-            }
+            }*/
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -290,10 +311,10 @@ public class DNSLookupService {
         dataOS.writeShort(0x0000);
 
         String[] domainParts = node.getHostName().split("\\.");
-        System.out.println(node.getHostName() + " has " + domainParts.length + " parts");
+        //System.out.println(node.getHostName() + " has " + domainParts.length + " parts");
 
         for (int i = 0; i < domainParts.length; i++) {
-            System.out.println("Writing: " + domainParts[i]);
+            //System.out.println("Writing: " + domainParts[i]);
             byte[] domainBytes = domainParts[i].getBytes("UTF-8");
             dataOS.writeByte(domainBytes.length);
             dataOS.write(domainBytes);
@@ -308,10 +329,10 @@ public class DNSLookupService {
 
         byte[] dnsFrame = bytearrayOS.toByteArray();
 
-        System.out.println("Sending: " + dnsFrame.length + " bytes");
+        /*System.out.println("Sending: " + dnsFrame.length + " bytes");
         for (int i = 0; i < dnsFrame.length; i++) {
             System.out.print("0x" + String.format("%x", dnsFrame[i]) + " ");
-        }
+        }*/
 
         // *** Send DNS Request Frame ***
         DatagramPacket dnsReqPacket = new DatagramPacket(dnsFrame, dnsFrame.length, address, port);
@@ -321,7 +342,7 @@ public class DNSLookupService {
         DatagramPacket packet = new DatagramPacket(buf, buf.length);
         socket.receive(packet);
 
-        System.out.println("\n\nReceived: " + packet.getLength() + " bytes");
+        /*System.out.println("\n\nReceived: " + packet.getLength() + " bytes");
 
         for (int i = 0; i < packet.getLength(); i++) {
             if (String.format("%x", buf[i]).length() == 1) {
@@ -337,7 +358,7 @@ public class DNSLookupService {
                 }
             }
         }
-        System.out.println("\n");
+        System.out.println("\n");*/
 
         return buf;
     }

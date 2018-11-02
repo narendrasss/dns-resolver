@@ -55,8 +55,9 @@ public class DNSResponse {
 	private void parseResponse() throws IOException {
 		id = data.readShort(); // transaction id
 
-		data.readByte(); // flags[0]
-		isAuthoritative = ((data.readByte() >> 2) & 1) == 1;
+		int flag = data.readByte();
+		isAuthoritative = ((flag >> 2) & 1) == 1;
+		data.readByte(); // rest of flags
 
 		int numQuestions = data.readShort();
 		int numAnswers = data.readShort();
@@ -128,8 +129,8 @@ public class DNSResponse {
 				break;
 		}
 
-		System.out.println("Creating records:");
-		System.out.println("Host: " + host + " Type: " + type + " Time to live: " + ttl + " Result: " + result + " InetAddress: " + ((ip != null) ? ip.getHostAddress() : "n/a"));
+		/*System.out.println("Creating records:");
+		System.out.println("Host: " + host + " Type: " + type + " Time to live: " + ttl + " Result: " + (result.length() == 0 ? "n/a" : result) + " InetAddress: " + ((ip != null) ? ip.getHostAddress() : "n/a"));*/
 		ResourceRecord record;
 		if (ip != null) {
 			record = new ResourceRecord(host, type, ttl, ip);
@@ -191,6 +192,7 @@ public class DNSResponse {
 		return result;
 	}
 
+	/* Helper functions for dealing with pointers */
 	private boolean isPointer(int i) {
 		return (i & POINTER_MASK) == POINTER_MASK;
 	}
