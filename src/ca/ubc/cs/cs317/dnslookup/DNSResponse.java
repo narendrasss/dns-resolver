@@ -16,8 +16,8 @@ public class DNSResponse {
 	private int numAuths;
 	private int numAdds;
 
-	public ArrayList<ResourceRecord> answers = new ArrayList();
-	public ArrayList<ResourceRecord> nameServers = new ArrayList();
+	public ArrayList<ResourceRecord> answers = new ArrayList<ResourceRecord>();
+	public ArrayList<ResourceRecord> nameServers = new ArrayList<ResourceRecord>();
 
 	public DNSResponse(byte[] data) {
 		this.data = new DataInputStream(new ByteArrayInputStream(data));
