@@ -1,23 +1,26 @@
 package ca.ubc.cs.cs317.dnslookup;
 
+import ca.ubc.cs.cs317.dnslookup.RecordType;
 import java.nio.ByteBuffer;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.net.InetAddress;
 
 public class DNSResponse {
 
 	private DataInputStream data;
 	private byte[] byteData;
 
+	private int POINTER_VAL = -64;
+
 	private int id;
-	private int numAnswers;
-	private int numAuths;
-	private int numAdds;
+	private boolean isAuthoritative = false;
 
 	public ArrayList<ResourceRecord> answers = new ArrayList<ResourceRecord>();
 	public ArrayList<ResourceRecord> nameServers = new ArrayList<ResourceRecord>();
+	public ArrayList<ResourceRecord> additionals = new ArrayList<ResourceRecord>();
 
 	public DNSResponse(byte[] data) {
 		this.data = new DataInputStream(new ByteArrayInputStream(data));
@@ -29,42 +32,138 @@ public class DNSResponse {
 		}
 	}
 
+	public ArrayList<ResourceRecord> getAnswers() {
+		return this.answers;
+	}
+
+	public ArrayList<ResourceRecord> getNameServers() {
+		return this.nameServers;
+	}
+
+	public int getId() {
+		return this.id;
+	}
+
+	public boolean isAuthoritative() {
+		return this.isAuthoritative;
+	}
+
 	private void parseResponse() throws IOException {
 		id = data.readShort(); // transaction id
-		data.readShort(); // flags
-		int numQuestions = data.readShort();
 
-		numAnswers = data.readShort();
-		numAuths = data.readShort();
-		numAdds = data.readShort();
+		data.readByte(); // flags[0]
+		isAuthoritative = ((data.readByte() >> 2) & 1) == 1;
+
+		int numQuestions = data.readShort();
+		int numAnswers = data.readShort();
+		int numAuths = data.readShort();
+		int numAdds = data.readShort();
 
 		for (int i = 0; i < numQuestions; i++) {
-			int nextByte;
-			while ((nextByte = data.readByte()) > 0) {
-				byte[] domainParts = new byte[nextByte];
-				for (int j = 0; j < nextByte; j++) {
-					domainParts[j] = data.readByte();
-				}
-			}
+			getDomainName();
 			data.readShort(); // question type
 			data.readShort(); // question class
 		}
-		parseAnswers();
+		parseData(numAnswers, answers);
+		parseData(numAuths, nameServers);
+		parseData(numAdds, additionals);
 	}
 
-	private void parseAnswers() {
-		for (int i = 0; i < numAnswers; i++) {
-
+	private void parseData(int numData, ArrayList<ResourceRecord> result) throws IOException {
+		for (int i = 0; i < numData; i++) {
+			ResourceRecord record = parseToResourceRecord();
+			result.add(record);
 		}
+	}
+
+	private ResourceRecord parseToResourceRecord() throws IOException {
+		String host = "";
+		RecordType type = null;
+		long ttl = 0;
+		String result = "";
+		InetAddress ip = null;
+
+		int nextByte = data.readByte();
+		if (nextByte == POINTER_VAL) {
+			int offset = data.readByte();
+			host = getDomainName(offset);
+		} else {
+			host = getDomainName();
+		}
+
+		type = RecordType.getByCode(data.readShort());
+		data.readShort(); // response class
+		ttl = data.readInt();
+
+		int length = data.readShort();
+
+		switch (type) {
+			// IPv4 address
+			case A:
+				byte[] addr4 = new byte[4];
+				for (int i = 0; i < 4; i++) {
+					addr4[i] = data.readByte();
+				}
+				ip = InetAddress.getByAddress(host, addr4);
+				break;
+			// IPv6 address
+			case AAAA:
+				byte[] addr6 = new byte[16];
+				for (int i = 0; i < 16; i++) {
+					addr6[i] = data.readByte();
+				}
+				ip = InetAddress.getByAddress(host, addr6);
+				break;
+			// domain names
+			case NS:
+			case CNAME:
+				result = getDomainName();
+				break;
+			// if any other type, do nothing
+			default:
+				break;
+		}
+
+		System.out.println("Creating records:");
+		System.out.println("Host: " + host + " Type: " + type + " Time to live: " + ttl + " Result: " + result + " InetAddress: " + ((ip != null) ? ip.getHostAddress() : "n/a"));
+		ResourceRecord record;
+		if (ip != null) {
+			record = new ResourceRecord(host, type, ttl, ip);
+		} else {
+			record = new ResourceRecord(host, type, ttl, result);
+		}
+		return record;
+	}
+
+	private String getDomainName() throws IOException {
+		int nextByte = data.readByte();
+		String result = "";
+		while (nextByte > 0 && nextByte != POINTER_VAL) {
+			byte[] domainParts = new byte[nextByte];
+			for (int j = 0; j < nextByte; j++) {
+				domainParts[j] = data.readByte();
+			}
+			String domain = new String(domainParts);
+			if (result.length() == 0) {
+				result = domain;
+			} else {
+				result = result + "." + domain;
+			}
+			nextByte = data.readByte();
+		}
+		if (nextByte == POINTER_VAL) {
+			int nextOffset = Byte.toUnsignedInt(data.readByte());
+			result = result + "." + getDomainName(nextOffset);
+		}
+		return result;
 	}
 
 	private String getDomainName(int offset) {
 		String result = "";
-		int pointer = -64;
 		int idx = offset;
 		int nextByte = byteData[idx];
 
-		while (nextByte != pointer && nextByte > 0) {
+		while (nextByte != POINTER_VAL && nextByte > 0) {
 			byte[] domainParts = new byte[nextByte];
 			idx++;
 			for (int i = 0; i < nextByte; i++) {
@@ -80,23 +179,11 @@ public class DNSResponse {
 				result = result + "." + domain;
 			}
 		}
-		if (nextByte == pointer) {
-			int nextOffset = byteData[idx + 1];
+		if (nextByte == POINTER_VAL) {
+			int nextOffset = Byte.toUnsignedInt(byteData[idx + 1]);
 			result = result + "." + getDomainName(nextOffset);
 		}
 		return result;
-	}
-
-	public ArrayList<ResourceRecord> getAnswers() {
-		return this.answers;
-	}
-
-	public ArrayList<ResourceRecord> getNameServers() {
-		return this.nameServers;
-	}
-
-	public int getId() {
-		return this.id;
 	}
 
 }
