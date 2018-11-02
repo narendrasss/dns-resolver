@@ -50,7 +50,7 @@ public class DNSResponse {
 			data.readShort(); // question class
 		}
 
-		System.out.println(getDomainName())
+		System.out.println(getDomainName());
 		parseAnswers();
 	}
 

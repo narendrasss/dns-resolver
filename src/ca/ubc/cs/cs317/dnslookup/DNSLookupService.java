@@ -239,23 +239,32 @@ public class DNSLookupService {
             // Example at
             // (https://stackoverflow.com/questions/36743226/java-send-udp-packet-to-dns-server/39375234)
 
-            parseResponse(response);
+            DNSResponse parsedResponse = new DNSResponse(response);
 
             // TODO - Need to create ResourceRecords for parsed response and add them to the
             // cache
 
             // Now that we've added all of the responses to the cache,
             // we should look at the cache and decide what to do based on what we got back.
-            Set<ResourceRecord> results = cache.getCachedResults(node);
-
-            // For every result we got back
-            for (ResourceRecord result : results) {
-                // Check what type of record it is
-                RecordType recordType = result.getType();
-                if (recordType.equals(RecordType.NS)) {
-                    // If it is NS, we need to get results from that server and add it to the cache
-                    retrieveResultsFromServer(result.getNode(), result.getInetResult());
-                }
+            ArrayList<ResourceRecord> answers = parsedResponse.getAnswers();
+            if (answers.size() == 0) {
+            	ArrayList<ResourceRecord> nameServers = parsedResponse.getNameServers();
+            	if (nameServers.size() == 0) {
+            		// EMPTY RESPONSE - The entire response was empty.
+            		return;
+            	} else {
+            		for (ResourceRecord ns : nameServers) {
+            			if (ns.getType() == RecordType.NS) {
+            				retrieveResultsFromServer(node, ns.getInetResult());
+            				break;
+            			}
+            		}
+            		return;
+            	}
+            } else {
+            	for (ResourceRecord a : answers) {
+            		cache.addResult(a);
+            	}
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -331,17 +340,6 @@ public class DNSLookupService {
         System.out.println("\n");
 
         return buf;
-    }
-
-    /**
-     * Takes a series of bytes representing a response, parses the response, builds
-     * the corresponding ResourceRecords, and adds them to the cache.
-     * 
-     * @param response
-     */
-    private static void parseResponse(byte[] response) {
-        DNSResponse parsedResponse = new DNSResponse(response);
-        // TODO - CONTINUE
     }
 
     private static void verbosePrintResourceRecord(ResourceRecord record, int rtype) {
