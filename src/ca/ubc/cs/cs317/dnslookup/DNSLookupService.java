@@ -312,15 +312,23 @@ public class DNSLookupService {
         DatagramPacket packet = new DatagramPacket(buf, buf.length);
         socket.receive(packet);
 
-        /*
-         * System.out.println("\n\nReceived: " + packet.getLength() + " bytes");
-         * 
-         * for (int i = 0; i < packet.getLength(); i++) { if (String.format("%x",
-         * buf[i]).length() == 1) { System.out.print(" 0" + String.format("%x", buf[i])
-         * + " "); } else { System.out.print(" " + String.format("%x", buf[i]) + " "); }
-         * if ((i + 1) % 8 == 0) { if ((i + 1) % 16 == 0) { System.out.print("\n"); }
-         * else { System.out.print("  "); } } } System.out.println("\n");
-         */
+        System.out.println("\n\nReceived: " + packet.getLength() + " bytes");
+
+        for (int i = 0; i < packet.getLength(); i++) {
+            if (String.format("%x", buf[i]).length() == 1) {
+                System.out.print(" 0" + String.format("%x", buf[i]) + " ");
+            } else {
+                System.out.print(" " + String.format("%x", buf[i]) + " ");
+            }
+            if ((i + 1) % 8 == 0) {
+                if ((i + 1) % 16 == 0) {
+                    System.out.print("\n");
+                } else {
+                    System.out.print("  ");
+                }
+            }
+        }
+        System.out.println("\n");
 
         return buf;
     }
