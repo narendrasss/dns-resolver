@@ -13,7 +13,7 @@ public class DNSResponse {
 	private DataInputStream data;
 	private byte[] byteData;
 
-	private int POINTER_VAL = -64;
+	private int POINTER_MASK = 0b11000000;
 
 	private int id;
 	private boolean isAuthoritative = false;
@@ -38,6 +38,10 @@ public class DNSResponse {
 
 	public ArrayList<ResourceRecord> getNameServers() {
 		return this.nameServers;
+	}
+
+	public ArrayList<ResourceRecord> getAdditionals() {
+		return this.additionals;
 	}
 
 	public int getId() {
@@ -84,9 +88,9 @@ public class DNSResponse {
 		InetAddress ip = null;
 
 		int nextByte = data.readByte();
-		if (nextByte == POINTER_VAL) {
-			int offset = data.readByte();
-			host = getDomainName(offset);
+		if (isPointer(nextByte)) {
+			int pointer = constructPointer(nextByte);
+			host = getDomainName(getOffset(pointer));
 		} else {
 			host = getDomainName();
 		}
@@ -100,8 +104,8 @@ public class DNSResponse {
 		switch (type) {
 			// IPv4 address
 			case A:
-				byte[] addr4 = new byte[4];
-				for (int i = 0; i < 4; i++) {
+				byte[] addr4 = new byte[length];
+				for (int i = 0; i < length; i++) {
 					addr4[i] = data.readByte();
 				}
 				ip = InetAddress.getByAddress(host, addr4);
@@ -138,7 +142,7 @@ public class DNSResponse {
 	private String getDomainName() throws IOException {
 		int nextByte = data.readByte();
 		String result = "";
-		while (nextByte > 0 && nextByte != POINTER_VAL) {
+		while (nextByte > 0 && !isPointer(nextByte)) {
 			byte[] domainParts = new byte[nextByte];
 			for (int j = 0; j < nextByte; j++) {
 				domainParts[j] = data.readByte();
@@ -151,9 +155,9 @@ public class DNSResponse {
 			}
 			nextByte = data.readByte();
 		}
-		if (nextByte == POINTER_VAL) {
-			int nextOffset = Byte.toUnsignedInt(data.readByte());
-			result = result + "." + getDomainName(nextOffset);
+		if (isPointer(nextByte)) {
+			int pointer = constructPointer(nextByte);
+			result = result + "." + getDomainName(getOffset(pointer));
 		}
 		return result;
 	}
@@ -163,7 +167,7 @@ public class DNSResponse {
 		int idx = offset;
 		int nextByte = byteData[idx];
 
-		while (nextByte != POINTER_VAL && nextByte > 0) {
+		while (!isPointer(nextByte) && nextByte > 0) {
 			byte[] domainParts = new byte[nextByte];
 			idx++;
 			for (int i = 0; i < nextByte; i++) {
@@ -179,11 +183,29 @@ public class DNSResponse {
 				result = result + "." + domain;
 			}
 		}
-		if (nextByte == POINTER_VAL) {
-			int nextOffset = Byte.toUnsignedInt(byteData[idx + 1]);
-			result = result + "." + getDomainName(nextOffset);
+		if (isPointer(nextByte)) {
+			int pointerPart = byteData[idx + 1];
+			int pointer = constructPointer(nextByte, pointerPart);
+			result = result + "." + getDomainName(getOffset(pointer));
 		}
 		return result;
+	}
+
+	private boolean isPointer(int i) {
+		return (i & POINTER_MASK) == POINTER_MASK;
+	}
+
+	private int constructPointer(int firstPart) throws IOException {
+		int rest = data.readByte();
+		return constructPointer(firstPart, rest);
+	}
+
+	private int constructPointer(int firstPart, int secondPart) {
+		return ((firstPart & 0xff) << 8 | secondPart & 0xff);
+	}
+
+	private int getOffset(int pointer) {
+		return (pointer & (1 << 14) - 1);
 	}
 
 }
