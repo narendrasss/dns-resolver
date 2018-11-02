@@ -49,8 +49,6 @@ public class DNSResponse {
 			data.readShort(); // question type
 			data.readShort(); // question class
 		}
-
-		System.out.println(getDomainName());
 		parseAnswers();
 	}
 
@@ -62,22 +60,29 @@ public class DNSResponse {
 
 	private String getDomainName(int offset) {
 		String result = "";
-		byte nextByte;
+		int pointer = -64;
 		int idx = offset;
+		int nextByte = byteData[idx];
 
-		while ((nextByte = byteData[idx]) > 0) {
+		while (nextByte != pointer && nextByte > 0) {
 			byte[] domainParts = new byte[nextByte];
+			idx++;
 			for (int i = 0; i < nextByte; i++) {
-				domainParts[i] = byteData[idx + i];
+				domainParts[i] = byteData[idx];
+				idx++;
 			}
-			idx += nextByte;
+			nextByte = byteData[idx];
 
-			String part = new String(domainParts);
+			String domain = new String(domainParts);
 			if (result.length() == 0) {
-				result = part;
+				result = domain;
 			} else {
-				result = result + "." + part;
+				result = result + "." + domain;
 			}
+		}
+		if (nextByte == pointer) {
+			int nextOffset = byteData[idx + 1];
+			result = result + "." + getDomainName(nextOffset);
 		}
 		return result;
 	}
