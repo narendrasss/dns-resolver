@@ -40,6 +40,10 @@ public class ResourceRecord implements Serializable {
         return node.getType();
     }
 
+    public void print() {
+        System.out.println("Host: " + node.getHostName() + " Type: " + node.getType() + " Result: " + textResult + "\n");
+    }
+
     /** The TTL for this record. It is returned based on the (ceiling of the) number of seconds
      * remaining until this record expires. The TTL returned by this method will only match the
      * TTL obtained from the DNS server in the first second from the time this record was

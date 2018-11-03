@@ -6,12 +6,15 @@ import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.net.InetAddress;
 
 public class DNSResponse {
 
 	private DataInputStream data;
 	private byte[] byteData;
+
+	private HashMap<Integer, String> domains = new HashMap<Integer, String>();
 
 	private int POINTER_MASK = 0b11000000;
 
@@ -53,7 +56,7 @@ public class DNSResponse {
 	}
 
 	private void parseResponse() throws IOException {
-		id = data.readShort(); // transaction id
+		id = data.readShort() & 0x00FFFF;
 
 		int flag = data.readByte();
 		isAuthoritative = ((flag >> 2) & 1) == 1;
@@ -88,13 +91,7 @@ public class DNSResponse {
 		String result = "";
 		InetAddress ip = null;
 
-		int nextByte = data.readByte();
-		if (isPointer(nextByte)) {
-			int pointer = constructPointer(nextByte);
-			host = getDomainName(getOffset(pointer));
-		} else {
-			host = getDomainName();
-		}
+		host = getDomainName();
 
 		type = RecordType.getByCode(data.readShort());
 		data.readShort(); // response class
@@ -129,8 +126,6 @@ public class DNSResponse {
 				break;
 		}
 
-		/*System.out.println("Creating records:");
-		System.out.println("Host: " + host + " Type: " + type + " Time to live: " + ttl + " Result: " + (result.length() == 0 ? "n/a" : result) + " InetAddress: " + ((ip != null) ? ip.getHostAddress() : "n/a"));*/
 		ResourceRecord record;
 		if (ip != null) {
 			record = new ResourceRecord(host, type, ttl, ip);
@@ -143,6 +138,16 @@ public class DNSResponse {
 	private String getDomainName() throws IOException {
 		int nextByte = data.readByte();
 		String result = "";
+
+		if (isPointer(nextByte)) {
+			int offset = getOffset(constructPointer(nextByte));
+			if (domains.containsKey(offset)) {
+				return domains.get(offset);
+			} else {
+				return getDomainName(offset);
+			}
+		}
+
 		while (nextByte > 0 && !isPointer(nextByte)) {
 			byte[] domainParts = new byte[nextByte];
 			for (int j = 0; j < nextByte; j++) {
@@ -189,6 +194,8 @@ public class DNSResponse {
 			int pointer = constructPointer(nextByte, pointerPart);
 			result = result + "." + getDomainName(getOffset(pointer));
 		}
+
+		domains.put(offset, result);
 		return result;
 	}
 

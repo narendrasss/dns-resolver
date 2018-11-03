@@ -17,7 +17,8 @@ public class DNSLookupService {
     private static final int MAX_INDIRECTION_LEVEL = 10;
 
     private static InetAddress rootServer;
-    private static boolean verboseTracing = false;
+    // TODO: Change this back to false
+    private static boolean verboseTracing = true;
     private static DatagramSocket socket;
 
     private static DNSCache cache = DNSCache.getInstance();
@@ -178,21 +179,29 @@ public class DNSLookupService {
      *         requested.
      */
     private static Set<ResourceRecord> getResults(DNSNode node, int indirectionLevel) {
-
         if (indirectionLevel > MAX_INDIRECTION_LEVEL) {
             System.err.println("Maximum number of indirection levels reached.");
             return Collections.emptySet();
         }
 
+        // TODO: Look first in cache before attempting to send DNS packet
+        //Set<ResourceRecord> cached = cache.getCachedResults(node);
+        //if (cached != null) return cached;
         // Get results starting at the root DNS server
         retrieveResultsFromServer(node, rootServer);
 
         // foundResults = did we find what we're looking for
         boolean foundResults = false;
-        DNSNode cNameNode = null;
+        DNSNode cNameNode = new DNSNode(node.getHostName(), RecordType.CNAME);
 
+        Set<ResourceRecord> cNames = cache.getCachedResults(cNameNode);
+        for (ResourceRecord r : cNames) {
+            DNSNode cName = new DNSNode(r.getTextResult(), node.getType());
+            getResults(cName, indirectionLevel++);
+            break;
+        }
         // For every cached resource record for the current name (ie. "google.com")
-        for (ResourceRecord result : cache.getCachedResults(node)) {
+        /*for (ResourceRecord result : cache.getCachedResults(node)) {
             // Check what type of record it is
             RecordType recordType = result.getType();
             if (recordType.equals(node.getType())) {
@@ -206,7 +215,7 @@ public class DNSLookupService {
                 // again at the root server with this
                 // We will only start again with this new node if foundResults == false, since
                 // that means we didn't find any good results
-                String cName = "";
+                String cName = result.getTextResult();
                 cNameNode = new DNSNode(cName, node.getType());
             }
         }
@@ -217,7 +226,7 @@ public class DNSLookupService {
             // for now, let's pretend we did
             // In that case, we recurse on getResults with +1 indirectionLevel
             return getResults(cNameNode, indirectionLevel++);
-        }
+        }*/
 
         return cache.getCachedResults(node);
     }
@@ -234,16 +243,15 @@ public class DNSLookupService {
         try {
             // Send our query to the given DNS server
             byte[] response = sendToDNS(node, server, DEFAULT_DNS_PORT);
-
-            // TODO - Need to get and parse response from server.
-            // Example at
-            // (https://stackoverflow.com/questions/36743226/java-send-udp-packet-to-dns-server/39375234)
-
             DNSResponse parsedResponse = new DNSResponse(response);
 
             ArrayList<ResourceRecord> answers = parsedResponse.getAnswers();
             ArrayList<ResourceRecord> nameServers = parsedResponse.getNameServers();
             ArrayList<ResourceRecord> additionals = parsedResponse.getAdditionals();
+
+            addAllToCache(answers);
+            addAllToCache(nameServers);
+            addAllToCache(additionals);
 
             if (verboseTracing) {
                 System.out.print("Response ID: " + parsedResponse.getId());
@@ -262,33 +270,42 @@ public class DNSLookupService {
                 }
             }
 
-            // TODO - Need to create ResourceRecords for parsed response and add them to the
-            // cache
-
             // Now that we've added all of the responses to the cache,
             // we should look at the cache and decide what to do based on what we got back.
-            /*ArrayList<ResourceRecord> answers = parsedResponse.getAnswers();
             if (answers.size() == 0) {
-            	ArrayList<ResourceRecord> nameServers = parsedResponse.getNameServers();
             	if (nameServers.size() == 0) {
             		// EMPTY RESPONSE - The entire response was empty.
             		return;
             	} else {
             		for (ResourceRecord ns : nameServers) {
             			if (ns.getType() == RecordType.NS) {
-            				retrieveResultsFromServer(node, ns.getInetResult());
+                            String nextHop = ns.getTextResult();
+                            InetAddress newAddress = getAddress(nextHop, additionals);
+                            if (newAddress == null) break;
+            				retrieveResultsFromServer(node, newAddress);
             				break;
             			}
             		}
             		return;
             	}
-            } else {
-            	for (ResourceRecord a : answers) {
-            		cache.addResult(a);
-            	}
-            }*/
+            }
         } catch (IOException e) {
             e.printStackTrace();
+        }
+    }
+
+    private static InetAddress getAddress(String nextHop, ArrayList<ResourceRecord> database) {
+        for (ResourceRecord record : database) {
+            if (record.getHostName().equals(nextHop)) {
+                return record.getInetResult();
+            }
+        }
+        return null;
+    }
+
+    private static void addAllToCache(ArrayList<ResourceRecord> input) {
+        for (ResourceRecord r : input) {
+            cache.addResult(r);
         }
     }
 
@@ -297,8 +314,9 @@ public class DNSLookupService {
         DataOutputStream dataOS = new DataOutputStream(bytearrayOS);
 
         // Transaction ID
-        // TODO - Should use random.getInt(65535) or something to produce unique IDs
-        dataOS.writeShort(0xAAAA);
+        Random rd = new Random();
+        int id = rd.nextInt(65535) & 0x00FFFF;
+        dataOS.writeShort(id);
         // Flags
         dataOS.writeShort(0x0100);
         // # Questions
@@ -334,6 +352,10 @@ public class DNSLookupService {
             System.out.print("0x" + String.format("%x", dnsFrame[i]) + " ");
         }*/
 
+        if (verboseTracing) {
+            System.out.print("\n\nQuery ID: " + id + " " + node.getHostName() + " " + node.getType() + " --> " + address.getHostAddress() + "\n");
+        }
+
         // *** Send DNS Request Frame ***
         DatagramPacket dnsReqPacket = new DatagramPacket(dnsFrame, dnsFrame.length, address, port);
         socket.send(dnsReqPacket);
@@ -342,7 +364,7 @@ public class DNSLookupService {
         DatagramPacket packet = new DatagramPacket(buf, buf.length);
         socket.receive(packet);
 
-        /*System.out.println("\n\nReceived: " + packet.getLength() + " bytes");
+        System.out.println("\nReceived: " + packet.getLength() + " bytes");
 
         for (int i = 0; i < packet.getLength(); i++) {
             if (String.format("%x", buf[i]).length() == 1) {
@@ -358,7 +380,7 @@ public class DNSLookupService {
                 }
             }
         }
-        System.out.println("\n");*/
+        System.out.println("\n");
 
         return buf;
     }
