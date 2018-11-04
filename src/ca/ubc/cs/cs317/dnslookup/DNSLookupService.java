@@ -196,7 +196,7 @@ public class DNSLookupService {
         if (altNames.size() > 0) {
             for (ResourceRecord name : altNames) {
                 DNSNode newNode = new DNSNode(name.getTextResult(), node.getType());
-                Set<ResourceRecord> altResults = getResults(newNode, 0);
+                Set<ResourceRecord> altResults = getResults(newNode, ++indirectionLevel);
                 for (ResourceRecord result : altResults) {
                     ResourceRecord update = new ResourceRecord(
                         node.getHostName(), node.getType(), result.getTTL(), result.getInetResult()
@@ -222,7 +222,7 @@ public class DNSLookupService {
         for (ResourceRecord cNameRecord : cNames) {
             // Restart search with CNAME
             DNSNode cName = new DNSNode(cNameRecord.getTextResult(), node.getType());
-            Set<ResourceRecord> cNameResults = getResults(cName, indirectionLevel++);
+            Set<ResourceRecord> cNameResults = getResults(cName, ++indirectionLevel);
             for (ResourceRecord record : cNameResults) {
                 ResourceRecord update = new ResourceRecord(
                     node.getHostName(), node.getType(), record.getTTL(), record.getInetResult()
