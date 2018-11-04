@@ -312,8 +312,8 @@ public class DNSResponse {
 
 	private ResourceRecord getLastCName(ResourceRecord record, Set<ResourceRecord> old) {
 		if (record.getType() == RecordType.CNAME) {
-			RecordType next = getRecord(record.getTextResult());
-		    if (!old.contains(next) {
+			ResourceRecord next = getRecord(record.getTextResult());
+		    if (!old.contains(next)) {
     			if (next != null) {
     				return getLastCName(next, old);
     			}
