@@ -189,10 +189,10 @@ public class DNSLookupService {
         Set<ResourceRecord> cached = cache.getCachedResults(node);
         if (cached.size() > 0) return cached;
 
-        // Look in cache if name has CNAME
+        // Look in cache if has CNAME
         DNSNode alt = new DNSNode(node.getHostName(), RecordType.CNAME);
         Set<ResourceRecord> altNames = cache.getCachedResults(alt);
-        // if has a CNAME, perform CNAME search
+        // if has a CNAME, perform search starting from CNAME
         if (altNames.size() > 0) {
             for (ResourceRecord name : altNames) {
                 DNSNode newNode = new DNSNode(name.getTextResult(), node.getType());
@@ -207,6 +207,7 @@ public class DNSLookupService {
             }
         }
 
+        // Otherwise search was never done before and no CNAMES
         // Get results starting at the root DNS server
         retrieveResultsFromServer(node, rootServer);
 
@@ -219,7 +220,7 @@ public class DNSLookupService {
         Set<ResourceRecord> cNames = cache.getCachedResults(cNameNode);
 
         for (ResourceRecord cNameRecord : cNames) {
-            // check cache if it has more CNAMEs
+            // Restart search with CNAME
             DNSNode cName = new DNSNode(cNameRecord.getTextResult(), node.getType());
             Set<ResourceRecord> cNameResults = getResults(cName, indirectionLevel++);
             for (ResourceRecord record : cNameResults) {
@@ -228,10 +229,11 @@ public class DNSLookupService {
                 );
                 cache.addResult(update);
             }
-            break;
+            return cache.getCachedResults(node);
         }
 
-        return cache.getCachedResults(node);
+        // Otherwise no results and no CNAMES
+        return Collections.emptySet();
     }
 
     /**
@@ -299,6 +301,14 @@ public class DNSLookupService {
         }
     }
 
+    /**
+     * Returns the InetAddress of the resource record that has host name next.
+     *
+     * @param next     Host name of the record that we are looking for.
+     * @param database The database that we are searching the record in.
+     * 
+     * @return InetAddress of the resource record if found, null otherwise.
+     */
     private static InetAddress getAddress(String next, ArrayList<ResourceRecord> database) {
         for (ResourceRecord record : database) {
             if (record.getHostName().equals(next) && record.getType() == RecordType.A) {
@@ -314,6 +324,17 @@ public class DNSLookupService {
         }
     }
 
+    /**
+     * Sends a DNS request frame based on the given node to the given DNS
+     * server address and port.
+     *
+     * @param node    Host name and record type to be used for the query.
+     * @param address Address of the server to be used for the query.
+     * @param port    Port the query should be sent to.
+     * @param wasSent Boolean to check if sendToDNS was called before.
+     * 
+     * @return A byte array consisting of the response data.
+     */
     private static byte[] sendToDNS(DNSNode node, InetAddress address, int port, boolean wasSent) throws IOException {
         ByteArrayOutputStream bytearrayOS = new ByteArrayOutputStream();
         DataOutputStream dataOS = new DataOutputStream(bytearrayOS);
@@ -333,10 +354,8 @@ public class DNSLookupService {
         dataOS.writeShort(0x0000);
 
         String[] domainParts = node.getHostName().split("\\.");
-        //System.out.println(node.getHostName() + " has " + domainParts.length + " parts");
 
         for (int i = 0; i < domainParts.length; i++) {
-            //System.out.println("Writing: " + domainParts[i]);
             byte[] domainBytes = domainParts[i].getBytes("UTF-8");
             dataOS.writeByte(domainBytes.length);
             dataOS.write(domainBytes);
@@ -344,59 +363,35 @@ public class DNSLookupService {
 
         // No more parts
         dataOS.writeByte(0x00);
-        // Type 0x01 = A (Host Request)
+        // Query type
         dataOS.writeShort(node.getType().getCode());
         // Class 0x01 = IN
         dataOS.writeShort(0x0001);
 
         byte[] dnsFrame = bytearrayOS.toByteArray();
 
-        /*System.out.println("Sending: " + dnsFrame.length + " bytes");
-        for (int i = 0; i < dnsFrame.length; i++) {
-            System.out.print("0x" + String.format("%x", dnsFrame[i]) + " ");
-        }*/
-
         if (verboseTracing) {
             System.out.print("\n\nQuery ID: " + id + " " + node.getHostName() + " " + node.getType() + " --> " + address.getHostAddress() + "\n");
         }
 
-        // *** Send DNS Request Frame ***
+        // Send DNS request frame
         DatagramPacket dnsReqPacket = new DatagramPacket(dnsFrame, dnsFrame.length, address, port);
         socket.send(dnsReqPacket);
 
+        // Await DNS frame
         byte[] buf = new byte[1024];
         DatagramPacket packet = new DatagramPacket(buf, buf.length);
         try {
             socket.receive(packet);
         } catch (SocketTimeoutException se) {
+            // Resend the same packet ONCE only
             if (!wasSent) {
                 sendToDNS(node, address, port, true);
             } else {
+                // Was sent before, return empty buffer array
                 return buf;
             }
         }
-
-        /*
-        System.out.println("\nReceived: " + packet.getLength() + " bytes");
-
-        for (int i = 0; i < packet.getLength(); i++) {
-            if (String.format("%x", buf[i]).length() == 1) {
-                System.out.print(" 0" + String.format("%x", buf[i]) + " ");
-            } else {
-                System.out.print(" " + String.format("%x", buf[i]) + " ");
-            }
-            if ((i + 1) % 8 == 0) {
-                if ((i + 1) % 16 == 0) {
-                    System.out.print("\n");
-                } else {
-                    System.out.print("  ");
-                }
-            }
-        }
-        System.out.println("\n");
-        */
-        
-
         return buf;
     }
 

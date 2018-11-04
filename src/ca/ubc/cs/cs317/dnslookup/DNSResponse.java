@@ -9,6 +9,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.net.InetAddress;
 
+/**
+ * The DNSResponse class corresponds to an entire result returned by a DNS
+ * response. The constructor takes in the hexadecimal byte array and provides
+ * getters for the different data contained in the DNS response.
+ */
 public class DNSResponse {
 
 	private DataInputStream data;
@@ -26,6 +31,7 @@ public class DNSResponse {
 	public ArrayList<ResourceRecord> nameServers = new ArrayList<ResourceRecord>();
 	public ArrayList<ResourceRecord> additionals = new ArrayList<ResourceRecord>();
 
+	/* Constructors and getters */
 	public DNSResponse(byte[] data) {
 		this.data = new DataInputStream(new ByteArrayInputStream(data));
 		this.byteData = data;
@@ -62,6 +68,10 @@ public class DNSResponse {
 		return this.isAuthoritative;
 	}
 
+	/**
+	 * Populates the answers, compressedAnswers, nameServers and additionals fields
+	 * based on the byte array that is passed to the constructor.
+	 */
 	private void parseResponse() throws IOException {
 		id = data.readShort() & 0x00FFFF;
 
@@ -85,6 +95,13 @@ public class DNSResponse {
 		parseData(numAdds, additionals);
 	}
 
+	/**
+	 * Populates the result array with data based on the byte array and
+	 * the number of data blocks to expect.
+	 * 
+	 * @param numData	Number of data 'blocks' to parse
+	 * @param result	The list to populate with resource records
+	 */
 	private void parseData(int numData, ArrayList<ResourceRecord> result) throws IOException {
 		for (int i = 0; i < numData; i++) {
 			ResourceRecord record = parseToResourceRecord();
@@ -92,6 +109,12 @@ public class DNSResponse {
 		}
 	}
 
+	/**
+	 * Parses the next block of data available into a resource record.
+	 * 
+	 * @return	A ResourceRecord containing information from the next
+	 * 			block of data.
+	 */
 	private ResourceRecord parseToResourceRecord() throws IOException {
 		String host = "";
 		RecordType type = null;
@@ -144,6 +167,14 @@ public class DNSResponse {
 		return record;
 	}
 
+	/**
+	 * Parses the next block of data into a domain name.
+	 * Note: Expects the next block of data to be in a format
+	 * 		 where it is possible to parse a domain from.
+	 * 
+	 * @return	The parsed domain name.
+	 * @throws IOException
+	 */
 	private String getDomainName() throws IOException {
 		int nextByte = data.readByte();
 		String result = "";
@@ -177,6 +208,14 @@ public class DNSResponse {
 		return result;
 	}
 
+	/**
+	 * Parses the byte array starting from offset to a domain name.
+	 * Every domain name returned is placed onto the 'domains' map,
+	 * with 'offset' as its key.
+	 * 
+	 * @param offset	The offset (from start) to start parsing.
+	 * @return	The parsed domain name.
+	 */
 	private String getDomainName(int offset) {
 		String result = "";
 		int idx = offset;
@@ -212,6 +251,22 @@ public class DNSResponse {
 		return result;
 	}
 
+	/**
+	 * Compresses the answers field, placing the result into
+	 * 'compressedAnswers'. Answers are commpressed by removing
+	 * redundant CNAMEs. A CNAME is redundant if:
+	 * 
+	 * 		- A domain name has a CNAME that has another CNAME in 
+	 * 		  the same answer block. In this case, a new CNAME record 
+	 * 		  is constructed with the first CNAME host and the last 
+	 * 		  CNAME text result.
+	 * 
+	 * 		- A domain name has a CNAME that the server knows the IP
+	 * 		  of (i.e. the result we want is in this answer block). 
+	 * 		  In this case we have essentially found the answer, so
+	 * 		  a new record is constructed with the original domain
+	 * 		  and the CNAME's IP.
+	 */
 	private void compressAnswers() {
 		for (ResourceRecord answer : answers) {
 			if (answer.getType() == RecordType.CNAME) {
@@ -235,6 +290,16 @@ public class DNSResponse {
 		}
 	}
 
+	/**
+	 * Recursive function to look for the 'last' CNAME for a given
+	 * record (e.g. if domain A has CNAME B, B has CNAME C, and
+	 * C has no further CNAMEs, then C is the last CNAME).
+	 * 
+	 * @param record	The first CNAME record to start search.
+	 * @return	The last CNAME found OR a record that contains an IP. 
+	 * 			If the original record has no further CNAMEs, then 
+	 * 			itself is returned.
+	 */
 	private ResourceRecord getLastCName(ResourceRecord record) {
 		if (record.getType() == RecordType.CNAME) {
 			ResourceRecord next = getRecord(record.getTextResult());
@@ -245,6 +310,14 @@ public class DNSResponse {
 		return record;
 	}
 
+	/**
+	 * Retrieves the first record in the response's answer block
+	 * that matches the given host name.
+	 * 
+	 * @param hostName	The host name we are looking for.
+	 * @return	ResourceRecord that matches the host name, if found.
+	 * 			Null if not found.
+	 */
 	private ResourceRecord getRecord(String hostName) {
 		for (ResourceRecord answer : answers) {
 			if (answer.getHostName().equals(hostName)) {
