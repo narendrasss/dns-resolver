@@ -278,6 +278,13 @@ public class DNSLookupService {
             addAllToCache(additionals);
 
             if (!isAuthoritative) {
+                // first look in additionals for potential answer
+                // should really only apply if we're looking for ip of NS
+                for (ResourceRecord add : additionals) {
+                    DNSNode additional = new DNSNode(add.getHostName(), add.getType());
+                    if (additional.equals(node))
+                        return;
+                }
                 if (nameServers.size() > 0) {
                     ResourceRecord ns = nameServers.get(0);
                     String next = ns.getTextResult();
@@ -294,7 +301,6 @@ public class DNSLookupService {
                     }
                 }
             }
-            
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -370,7 +376,7 @@ public class DNSLookupService {
         byte[] dnsFrame = bytearrayOS.toByteArray();
 
         if (verboseTracing) {
-            System.out.print("\n\nQuery ID: " + id + " " + node.getHostName() + " " + node.getType() + " --> " + address.getHostAddress() + "\n");
+            System.out.print("\n\nQuery ID:    " + id + " " + node.getHostName() + "  " + node.getType() + " --> " + address.getHostAddress() + "\n");
         }
 
         // Send DNS request frame
