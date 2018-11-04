@@ -18,8 +18,7 @@ public class DNSLookupService {
     private static final int MAX_INDIRECTION_LEVEL = 10;
 
     private static InetAddress rootServer;
-    // TODO: Change this back to false
-    private static boolean verboseTracing = true;
+    private static boolean verboseTracing = false;
     private static DatagramSocket socket;
 
     private static DNSCache cache = DNSCache.getInstance();
