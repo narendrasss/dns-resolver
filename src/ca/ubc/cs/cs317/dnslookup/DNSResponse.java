@@ -294,18 +294,26 @@ public class DNSResponse {
 
 	/**
 	 * Recursive function to look for the 'last' CNAME for a given
-	 * record (e.g. if domain A has CNAME B, B has CNAME C, and
-	 * C has no further CNAMEs, then C is the last CNAME).
+	 * record. Two possible cases:
+	 * 		1. Domain A has CNAME B, B has CNAME C, C has CNAME D,
+	 * 		   and so on. Last CNAME in this 'path' should be returned.
+	 * 		2. Domain A has CNAME B, B is an A or AAAA resource record.
+	 * 		   Here, B should be returned.
 	 * 
 	 * @param record	The first CNAME record to start search.
-	 * @return	The last CNAME found OR a record that contains an IP. 
-	 * 			If the original record has no further CNAMEs, then 
-	 * 			itself is returned.
+	 * @return	The last CNAME found OR an A / AAAA record. If the 
+	 * 			record has no further CNAMEs, then itself is returned.
 	 */
+	private ResourceRecord getLastCName(ResourceRecord record) {
+	    Set<ResourceRecord> set = new HashSet<ResourceRecord>();
+	    set.add(record);
+	    return getLastCName(record, set);
+	}
+
 	private ResourceRecord getLastCName(ResourceRecord record, Set<ResourceRecord> old) {
 		if (record.getType() == RecordType.CNAME) {
-		    if (!old.contains(getRecord(record.getTextResult()))) {
-    			ResourceRecord next = getRecord(record.getTextResult());
+			RecordType next = getRecord(record.getTextResult());
+		    if (!old.contains(next) {
     			if (next != null) {
     				return getLastCName(next, old);
     			}
@@ -314,12 +322,6 @@ public class DNSResponse {
 		    }
 		}
 		return record;
-	}
-	
-	private ResourceRecord getLastCName(ResourceRecord record) {
-	    Set<ResourceRecord> set = new HashSet<ResourceRecord>();
-	    set.add(record);
-	    return getLastCName(record, set);
 	}
 
 	/**
