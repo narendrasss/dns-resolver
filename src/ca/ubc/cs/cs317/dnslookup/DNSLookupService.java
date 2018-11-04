@@ -185,19 +185,26 @@ public class DNSLookupService {
             return Collections.emptySet();
         }
 
-        // TODO: Look first in cache before attempting to send DNS packet
+        // Before doing anything, first look in cache
         Set<ResourceRecord> cached = cache.getCachedResults(node);
         if (cached.size() > 0) return cached;
+
         // Get results starting at the root DNS server
         retrieveResultsFromServer(node, rootServer);
 
+        // Check if there are answers
+        Set<ResourceRecord> results = cache.getCachedResults(node);
+        if (results.size() > 0) return results;
+
+        // Otherwise there might be CNAMEs
         DNSNode cNameNode = new DNSNode(node.getHostName(), RecordType.CNAME);
         Set<ResourceRecord> cNames = cache.getCachedResults(cNameNode);
 
         for (ResourceRecord cNameRecord : cNames) {
+            // check cache if it has more CNAMEs
             DNSNode cName = new DNSNode(cNameRecord.getTextResult(), node.getType());
-            Set<ResourceRecord> results = getResults(cName, indirectionLevel++);
-            for (ResourceRecord record : results) {
+            Set<ResourceRecord> cNameResults = getResults(cName, indirectionLevel++);
+            for (ResourceRecord record : cNameResults) {
                 ResourceRecord update = new ResourceRecord(
                     node.getHostName(), node.getType(), record.getTTL(), record.getInetResult()
                 );
@@ -229,26 +236,27 @@ public class DNSLookupService {
             ArrayList<ResourceRecord> additionals = parsedResponse.getAdditionals();
             boolean isAuthoritative = parsedResponse.getIsAuthoritative();
 
-            addAllToCache(answers);
-            addAllToCache(nameServers);
-            addAllToCache(additionals);
-
             if (verboseTracing) {
                 System.out.print("Response ID: " + parsedResponse.getId());
                 System.out.print(" Authoritative: " + isAuthoritative + "\n");
-                System.out.println("Answers (" + parsedResponse.getAnswers().size() + ")");
+                System.out.println("  Answers (" + parsedResponse.getAnswers().size() + ")");
                 for (ResourceRecord r : answers) {
                     verbosePrintResourceRecord(r, r.getType().getCode());
                 }
-                System.out.println("Nameservers (" + parsedResponse.getNameServers().size() + ")");
+                System.out.println("  Nameservers (" + parsedResponse.getNameServers().size() + ")");
                 for (ResourceRecord r : nameServers) {
                     verbosePrintResourceRecord(r, r.getType().getCode());
                 }
-                System.out.println("Additional Information (" + parsedResponse.getAdditionals().size() + ")");
+                System.out.println("  Additional Information (" + parsedResponse.getAdditionals().size() + ")");
                 for (ResourceRecord r : additionals) {
                     verbosePrintResourceRecord(r, r.getType().getCode());
                 }
             }
+
+            addAllToCache(answers);
+            addAllToCache(parsedResponse.getCompressedAnswers());
+            addAllToCache(nameServers);
+            addAllToCache(additionals);
 
             if (!isAuthoritative) {
                 if (nameServers.size() > 0) {
@@ -345,6 +353,8 @@ public class DNSLookupService {
         } catch (SocketTimeoutException se) {
             if (!wasSent) {
                 sendToDNS(node, address, port, true);
+            } else {
+                return buf;
             }
         }
 

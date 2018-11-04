@@ -22,6 +22,7 @@ public class DNSResponse {
 	private boolean isAuthoritative = false;
 
 	public ArrayList<ResourceRecord> answers = new ArrayList<ResourceRecord>();
+	public ArrayList<ResourceRecord> compressedAnswers = new ArrayList<ResourceRecord>();
 	public ArrayList<ResourceRecord> nameServers = new ArrayList<ResourceRecord>();
 	public ArrayList<ResourceRecord> additionals = new ArrayList<ResourceRecord>();
 
@@ -39,6 +40,10 @@ public class DNSResponse {
 
 	public ArrayList<ResourceRecord> getAnswers() {
 		return this.answers;
+	}
+
+	public ArrayList<ResourceRecord> getCompressedAnswers() {
+		return this.compressedAnswers;
 	}
 
 	public ArrayList<ResourceRecord> getNameServers() {
@@ -75,6 +80,7 @@ public class DNSResponse {
 			data.readShort(); // question class
 		}
 		parseData(numAnswers, answers);
+		compressAnswers();
 		parseData(numAuths, nameServers);
 		parseData(numAdds, additionals);
 	}
@@ -125,6 +131,7 @@ public class DNSResponse {
 				break;
 			// if any other type, do nothing
 			default:
+				result = "---";
 				break;
 		}
 
@@ -203,6 +210,48 @@ public class DNSResponse {
 
 		domains.put(offset, result);
 		return result;
+	}
+
+	private void compressAnswers() {
+		for (ResourceRecord answer : answers) {
+			if (answer.getType() == RecordType.CNAME) {
+				ResourceRecord next = getLastCName(answer);
+				if (next == answer) {
+					compressedAnswers.add(answer);
+				} else {
+					ResourceRecord update;
+					if (next.getType() == RecordType.CNAME) {
+						update = new ResourceRecord(
+							answer.getHostName(), next.getType(), next.getTTL(), next.getTextResult()
+						);
+					} else {
+						update = new ResourceRecord(
+							answer.getHostName(), next.getType(), next.getTTL(), next.getInetResult()
+						);
+					}
+					compressedAnswers.add(update);
+				}
+			}
+		}
+	}
+
+	private ResourceRecord getLastCName(ResourceRecord record) {
+		if (record.getType() == RecordType.CNAME) {
+			ResourceRecord next = getRecord(record.getTextResult());
+			if (next != null) {
+				return getLastCName(next);
+			}
+		}
+		return record;
+	}
+
+	private ResourceRecord getRecord(String hostName) {
+		for (ResourceRecord answer : answers) {
+			if (answer.getHostName().equals(hostName)) {
+				return answer;
+			}
+		}
+		return null;
 	}
 
 	/* Helper functions for dealing with pointers */
