@@ -28,10 +28,12 @@ public class DNSResponse {
 	public DNSResponse(byte[] data) {
 		this.data = new DataInputStream(new ByteArrayInputStream(data));
 		this.byteData = data;
-		try {
-			parseResponse();
-		} catch (IOException e) {
-			e.printStackTrace();
+		if (data.length > 0) {
+			try {
+				parseResponse();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
 		}
 	}
 
@@ -51,7 +53,7 @@ public class DNSResponse {
 		return this.id;
 	}
 
-	public boolean isAuthoritative() {
+	public boolean getIsAuthoritative() {
 		return this.isAuthoritative;
 	}
 
@@ -172,6 +174,10 @@ public class DNSResponse {
 		String result = "";
 		int idx = offset;
 		int nextByte = byteData[idx];
+
+		if (domains.containsKey(offset)) {
+			return domains.get(offset);
+		}
 
 		while (!isPointer(nextByte) && nextByte > 0) {
 			byte[] domainParts = new byte[nextByte];

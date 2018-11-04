@@ -8,6 +8,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.util.*;
 
@@ -185,48 +186,25 @@ public class DNSLookupService {
         }
 
         // TODO: Look first in cache before attempting to send DNS packet
-        //Set<ResourceRecord> cached = cache.getCachedResults(node);
-        //if (cached != null) return cached;
+        Set<ResourceRecord> cached = cache.getCachedResults(node);
+        if (cached.size() > 0) return cached;
         // Get results starting at the root DNS server
         retrieveResultsFromServer(node, rootServer);
 
-        // foundResults = did we find what we're looking for
-        boolean foundResults = false;
         DNSNode cNameNode = new DNSNode(node.getHostName(), RecordType.CNAME);
-
         Set<ResourceRecord> cNames = cache.getCachedResults(cNameNode);
-        for (ResourceRecord r : cNames) {
-            DNSNode cName = new DNSNode(r.getTextResult(), node.getType());
-            getResults(cName, indirectionLevel++);
+
+        for (ResourceRecord cNameRecord : cNames) {
+            DNSNode cName = new DNSNode(cNameRecord.getTextResult(), node.getType());
+            Set<ResourceRecord> results = getResults(cName, indirectionLevel++);
+            for (ResourceRecord record : results) {
+                ResourceRecord update = new ResourceRecord(
+                    node.getHostName(), node.getType(), record.getTTL(), record.getInetResult()
+                );
+                cache.addResult(update);
+            }
             break;
         }
-        // For every cached resource record for the current name (ie. "google.com")
-        /*for (ResourceRecord result : cache.getCachedResults(node)) {
-            // Check what type of record it is
-            RecordType recordType = result.getType();
-            if (recordType.equals(node.getType())) {
-                // If it is the same type as what we're looking for, we have found what we need
-                // and don't need to look anymore
-                // Note: node.getType() should be RecordType.A or RecordType.AAAA
-                // Anything else is probably an error
-                foundResults = true;
-            } else if (recordType.equals(RecordType.CNAME)) {
-                // TODO - Since this is a CNAME, we need to build a NEW query node and start
-                // again at the root server with this
-                // We will only start again with this new node if foundResults == false, since
-                // that means we didn't find any good results
-                String cName = result.getTextResult();
-                cNameNode = new DNSNode(cName, node.getType());
-            }
-        }
-
-        // If we did NOT find any A or AAAA records
-        if (!foundResults) {
-            // Should probably check in here whether or not we actually found a CNAME, but
-            // for now, let's pretend we did
-            // In that case, we recurse on getResults with +1 indirectionLevel
-            return getResults(cNameNode, indirectionLevel++);
-        }*/
 
         return cache.getCachedResults(node);
     }
@@ -242,12 +220,14 @@ public class DNSLookupService {
     private static void retrieveResultsFromServer(DNSNode node, InetAddress server) {
         try {
             // Send our query to the given DNS server
-            byte[] response = sendToDNS(node, server, DEFAULT_DNS_PORT);
-            DNSResponse parsedResponse = new DNSResponse(response);
+            DNSResponse parsedResponse = new DNSResponse(
+                sendToDNS(node, server, DEFAULT_DNS_PORT, false)
+            );
 
             ArrayList<ResourceRecord> answers = parsedResponse.getAnswers();
             ArrayList<ResourceRecord> nameServers = parsedResponse.getNameServers();
             ArrayList<ResourceRecord> additionals = parsedResponse.getAdditionals();
+            boolean isAuthoritative = parsedResponse.getIsAuthoritative();
 
             addAllToCache(answers);
             addAllToCache(nameServers);
@@ -255,7 +235,7 @@ public class DNSLookupService {
 
             if (verboseTracing) {
                 System.out.print("Response ID: " + parsedResponse.getId());
-                System.out.print(" Authoritative: " + parsedResponse.isAuthoritative() + "\n");
+                System.out.print(" Authoritative: " + isAuthoritative + "\n");
                 System.out.println("Answers (" + parsedResponse.getAnswers().size() + ")");
                 for (ResourceRecord r : answers) {
                     verbosePrintResourceRecord(r, r.getType().getCode());
@@ -270,33 +250,32 @@ public class DNSLookupService {
                 }
             }
 
-            // Now that we've added all of the responses to the cache,
-            // we should look at the cache and decide what to do based on what we got back.
-            if (answers.size() == 0) {
-            	if (nameServers.size() == 0) {
-            		// EMPTY RESPONSE - The entire response was empty.
-            		return;
-            	} else {
-            		for (ResourceRecord ns : nameServers) {
-            			if (ns.getType() == RecordType.NS) {
-                            String nextHop = ns.getTextResult();
-                            InetAddress newAddress = getAddress(nextHop, additionals);
-                            if (newAddress == null) break;
-            				retrieveResultsFromServer(node, newAddress);
-            				break;
-            			}
-            		}
-            		return;
-            	}
+            if (!isAuthoritative) {
+                if (nameServers.size() > 0) {
+                    ResourceRecord ns = nameServers.get(0);
+                    String next = ns.getTextResult();
+                    InetAddress ip = getAddress(next, additionals);
+                    if (ip != null) {
+                        retrieveResultsFromServer(node, ip);
+                    } else /* need to look for ip of name server */ {
+                        DNSNode nameServer = new DNSNode(next, RecordType.A);
+                        Set<ResourceRecord> results = getResults(nameServer, 0);
+                        for (ResourceRecord record : results) {
+                            retrieveResultsFromServer(node, record.getInetResult());
+                            break;
+                        }
+                    }
+                }
             }
+            
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    private static InetAddress getAddress(String nextHop, ArrayList<ResourceRecord> database) {
+    private static InetAddress getAddress(String next, ArrayList<ResourceRecord> database) {
         for (ResourceRecord record : database) {
-            if (record.getHostName().equals(nextHop)) {
+            if (record.getHostName().equals(next) && record.getType() == RecordType.A) {
                 return record.getInetResult();
             }
         }
@@ -309,16 +288,15 @@ public class DNSLookupService {
         }
     }
 
-    private static byte[] sendToDNS(DNSNode node, InetAddress address, int port) throws IOException {
+    private static byte[] sendToDNS(DNSNode node, InetAddress address, int port, boolean wasSent) throws IOException {
         ByteArrayOutputStream bytearrayOS = new ByteArrayOutputStream();
         DataOutputStream dataOS = new DataOutputStream(bytearrayOS);
 
         // Transaction ID
-        Random rd = new Random();
-        int id = rd.nextInt(65535) & 0x00FFFF;
+        int id = random.nextInt(65535) & 0x00FFFF;
         dataOS.writeShort(id);
         // Flags
-        dataOS.writeShort(0x0100);
+        dataOS.writeShort(0x0000);
         // # Questions
         dataOS.writeShort(0x0001);
         // # Answers (Should be 0 since we're querying)
@@ -362,8 +340,15 @@ public class DNSLookupService {
 
         byte[] buf = new byte[1024];
         DatagramPacket packet = new DatagramPacket(buf, buf.length);
-        socket.receive(packet);
+        try {
+            socket.receive(packet);
+        } catch (SocketTimeoutException se) {
+            if (!wasSent) {
+                sendToDNS(node, address, port, true);
+            }
+        }
 
+        /*
         System.out.println("\nReceived: " + packet.getLength() + " bytes");
 
         for (int i = 0; i < packet.getLength(); i++) {
@@ -381,6 +366,7 @@ public class DNSLookupService {
             }
         }
         System.out.println("\n");
+        */
 
         return buf;
     }
