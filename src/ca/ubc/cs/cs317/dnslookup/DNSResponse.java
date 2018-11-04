@@ -7,6 +7,8 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 import java.net.InetAddress;
 
 /**
@@ -300,14 +302,24 @@ public class DNSResponse {
 	 * 			If the original record has no further CNAMEs, then 
 	 * 			itself is returned.
 	 */
-	private ResourceRecord getLastCName(ResourceRecord record) {
+	private ResourceRecord getLastCName(ResourceRecord record, Set<ResourceRecord> old) {
 		if (record.getType() == RecordType.CNAME) {
-			ResourceRecord next = getRecord(record.getTextResult());
-			if (next != null) {
-				return getLastCName(next);
-			}
+		    if (!old.contains(getRecord(record.getTextResult()))) {
+    			ResourceRecord next = getRecord(record.getTextResult());
+    			if (next != null) {
+    				return getLastCName(next, old);
+    			}
+		    } else {
+		        return record;
+		    }
 		}
 		return record;
+	}
+	
+	private ResourceRecord getLastCName(ResourceRecord record) {
+	    Set<ResourceRecord> set = new HashSet<ResourceRecord>();
+	    set.add(record);
+	    return getLastCName(record, set);
 	}
 
 	/**

@@ -196,7 +196,7 @@ public class DNSLookupService {
         if (altNames.size() > 0) {
             for (ResourceRecord name : altNames) {
                 DNSNode newNode = new DNSNode(name.getTextResult(), node.getType());
-                Set<ResourceRecord> altResults = getResults(newNode, 0);
+                Set<ResourceRecord> altResults = getResults(newNode, indirectionLevel++);
                 for (ResourceRecord result : altResults) {
                     ResourceRecord update = new ResourceRecord(
                         node.getHostName(), node.getType(), result.getTTL(), result.getInetResult()
