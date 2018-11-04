@@ -185,9 +185,27 @@ public class DNSLookupService {
             return Collections.emptySet();
         }
 
-        // Before doing anything, first look in cache
+        // Look in cache if EXACT search was done before
         Set<ResourceRecord> cached = cache.getCachedResults(node);
         if (cached.size() > 0) return cached;
+
+        // Look in cache if name has CNAME
+        DNSNode alt = new DNSNode(node.getHostName(), RecordType.CNAME);
+        Set<ResourceRecord> altNames = cache.getCachedResults(alt);
+        // if has a CNAME, perform CNAME search
+        if (altNames.size() > 0) {
+            for (ResourceRecord name : altNames) {
+                DNSNode newNode = new DNSNode(name.getTextResult(), node.getType());
+                Set<ResourceRecord> altResults = getResults(newNode, 0);
+                for (ResourceRecord result : altResults) {
+                    ResourceRecord update = new ResourceRecord(
+                        node.getHostName(), node.getType(), result.getTTL(), result.getInetResult()
+                    );
+                    cache.addResult(update);
+                }
+                return cache.getCachedResults(node);
+            }
+        }
 
         // Get results starting at the root DNS server
         retrieveResultsFromServer(node, rootServer);
@@ -377,6 +395,7 @@ public class DNSLookupService {
         }
         System.out.println("\n");
         */
+        
 
         return buf;
     }

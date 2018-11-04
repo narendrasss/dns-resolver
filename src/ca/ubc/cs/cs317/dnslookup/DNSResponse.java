@@ -269,7 +269,7 @@ public class DNSResponse {
 	}
 
 	private int getOffset(int pointer) {
-		return (pointer & (1 << 14) - 1);
+		return (pointer & (1 << 14) - 1) & 0b0011111111111111;
 	}
 
 }
