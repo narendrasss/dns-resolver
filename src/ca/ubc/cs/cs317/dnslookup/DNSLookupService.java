@@ -286,7 +286,7 @@ public class DNSLookupService {
                         return;
                 }
                 if (nameServers.size() > 0) {
-                    ResourceRecord ns = nameServers.get(0);
+                    ResourceRecord ns = getNextNameServer(nameServers, additionals);
                     String next = ns.getTextResult();
                     InetAddress ip = getAddress(next, additionals);
                     if (ip != null) {
@@ -304,6 +304,24 @@ public class DNSLookupService {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    /**
+     * Returns the first name server that has an IP in additionals. If no
+     * such name server exists, return the first name server.
+     *
+     * @param nameServers   List of name servers parsed from response
+     * @param adds          List of additional information parsed 
+     *                      from response
+     * 
+     * @return ResourceRecord containing information about the name server.
+     */
+    private static ResourceRecord getNextNameServer(ArrayList<ResourceRecord> nameServers, ArrayList<ResourceRecord> adds) {
+        for (ResourceRecord ns : nameServers) {
+            InetAddress ip = getAddress(ns.getTextResult(), adds);
+            if (ip != null) return ns;
+        }
+        return nameServers.get(0);
     }
 
     /**
