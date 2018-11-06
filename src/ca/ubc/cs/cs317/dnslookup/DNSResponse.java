@@ -296,16 +296,6 @@ public class DNSResponse {
 		}
 	}
 
-	private Set<ResourceRecord> getRecords(String host, ArrayList<ResourceRecord> database) {
-		Set<ResourceRecord> result = new HashSet<ResourceRecord>();
-		for (ResourceRecord record : database) {
-			if (record.getHostName().equals(host)) {
-				result.add(record);
-			}
-		}
-		return result;
-	}
-
 	/**
 	 * Recursive function to look for the 'last' CNAME for a given
 	 * record. Two possible cases:
@@ -353,6 +343,24 @@ public class DNSResponse {
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * Retrieves all records with host name host.
+	 * 
+	 * @param hostName The host name we are looking for.
+	 * @param database The list of records to search in.
+	 * @return  Set of ResourceRecords that matches the host name, if found.
+	 * 			Returns empty set otherwise.
+	 */
+	private Set<ResourceRecord> getRecords(String host, ArrayList<ResourceRecord> database) {
+		Set<ResourceRecord> result = new HashSet<ResourceRecord>();
+		for (ResourceRecord record : database) {
+			if (record.getHostName().equals(host)) {
+				result.add(record);
+			}
+		}
+		return result;
 	}
 
 	/* Helper functions for dealing with pointers */
