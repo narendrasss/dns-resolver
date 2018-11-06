@@ -276,20 +276,34 @@ public class DNSResponse {
 				if (next == answer) {
 					compressedAnswers.add(answer);
 				} else {
-					ResourceRecord update;
 					if (next.getType() == RecordType.CNAME) {
-						update = new ResourceRecord(
+						ResourceRecord update = new ResourceRecord(
 							answer.getHostName(), next.getType(), next.getTTL(), next.getTextResult()
 						);
+						compressedAnswers.add(update);
 					} else {
-						update = new ResourceRecord(
-							answer.getHostName(), next.getType(), next.getTTL(), next.getInetResult()
-						);
+						// add all records with this new host name
+						Set<ResourceRecord> updates = getRecords(next.getHostName(), answers);
+						for (ResourceRecord record : updates) {
+							ResourceRecord newRecord = new ResourceRecord(
+								answer.getHostName(), record.getType(), record.getTTL(), record.getInetResult()
+							);
+							compressedAnswers.add(newRecord);
+						}
 					}
-					compressedAnswers.add(update);
 				}
 			}
 		}
+	}
+
+	private Set<ResourceRecord> getRecords(String host, ArrayList<ResourceRecord> database) {
+		Set<ResourceRecord> result = new HashSet<ResourceRecord>();
+		for (ResourceRecord record : database) {
+			if (record.getHostName().equals(host)) {
+				result.add(record);
+			}
+		}
+		return result;
 	}
 
 	/**
